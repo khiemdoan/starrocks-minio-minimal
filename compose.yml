@@ -1,0 +1,124 @@
+services:
+  starrocks-fe:
+    image: starrocks/fe-ubuntu:3.5-latest
+    restart: unless-stopped
+    container_name: starrocks-fe
+    hostname: starrocks-fe
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo "# enable shared data, set storage type, set endpoint" >> /opt/starrocks/fe/conf/fe.conf
+        echo "run_mode = shared_data" >> /opt/starrocks/fe/conf/fe.conf
+        echo "cloud_native_storage_type = S3" >> /opt/starrocks/fe/conf/fe.conf
+        echo "aws_s3_endpoint = minio:9000" >> /opt/starrocks/fe/conf/fe.conf
+
+        echo "# set the path in MinIO" >> /opt/starrocks/fe/conf/fe.conf
+        echo "aws_s3_path = starrocks" >> /opt/starrocks/fe/conf/fe.conf
+
+        echo "# credentials for MinIO object read/write" >> /opt/starrocks/fe/conf/fe.conf
+        echo "aws_s3_access_key = ${MINIO_ACCESS_KEY}" >> /opt/starrocks/fe/conf/fe.conf
+        echo "aws_s3_secret_key = ${MINIO_SECRET_KEY}" >> /opt/starrocks/fe/conf/fe.conf
+        echo "aws_s3_use_instance_profile = false" >> /opt/starrocks/fe/conf/fe.conf
+        echo "aws_s3_use_aws_sdk_default_behavior = false" >> /opt/starrocks/fe/conf/fe.conf
+
+        echo "# Set this to false if you do not want default" >> /opt/starrocks/fe/conf/fe.conf
+        echo "# storage created in the object storage using" >> /opt/starrocks/fe/conf/fe.conf
+        echo "# the details provided above" >> /opt/starrocks/fe/conf/fe.conf
+        echo "enable_load_volume_from_conf = true" >> /opt/starrocks/fe/conf/fe.conf
+
+        /opt/starrocks/fe/bin/start_fe.sh --host_type FQDN
+    ports:
+      - 8030:8030/tcp
+      - 9020:9020/tcp
+      - 9030:9030/tcp
+    volumes:
+      - .data/starrocks:/opt/starrocks/fe/meta
+    healthcheck:
+      test: 'mysql -u root -h starrocks-fe -P 9030 -e "show frontends\G" |grep "Alive: true"'
+      interval: 60s
+      timeout: 1s
+      retries: 3
+      start_period: 1s
+      start_interval: 1s
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  starrocks-cn:
+    image: starrocks/cn-ubuntu:3.5-latest
+    restart: unless-stopped
+    container_name: starrocks-cn
+    hostname: starrocks-cn
+    command:
+      - /bin/bash
+      - -c
+      - |
+        sleep 15s;
+        ulimit -u 65535;
+        ulimit -n 65535;
+        mysql --connect-timeout 2 -h starrocks-fe -P9030 -uroot -e "ALTER SYSTEM ADD COMPUTE NODE \"starrocks-cn:9050\";"
+        /opt/starrocks/cn/bin/start_cn.sh
+    environment:
+      - HOST_TYPE=FQDN
+    ports:
+      - 8040:8040
+    healthcheck:
+      test: 'mysql -u root -h starrocks-fe -P 9030 -e "SHOW COMPUTE NODES\G" |grep "Alive: true"'
+      interval: 60s
+      timeout: 1s
+      retries: 3
+      start_period: 1s
+      start_interval: 1s
+    depends_on:
+      starrocks-fe:
+        condition: service_healthy
+        restart: true
+      minio:
+        condition: service_healthy
+
+  minio_mc:
+    # This service is short lived, it does this:
+    # - starts up
+    # - checks to see if the MinIO service `minio` is ready
+    # - creates a MinIO Access Key that the StarRocks services will use
+    # - exits
+    image: quay.io/minio/mc:latest
+    entrypoint:
+      - sh
+      - -c
+      - |
+        until mc ls minio > /dev/null 2>&1; do
+          sleep 0.5
+        done
+
+        mc alias set myminio http://minio:9000 ${MINIO_USER} ${MINIO_PASSWORD}
+        mc admin user svcacct add \
+        --access-key ${MINIO_ACCESS_KEY} \
+        --secret-key ${MINIO_SECRET_KEY} \
+        myminio ${MINIO_USER}
+        mc mb -p myminio/starrocks
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  minio:
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    ports:
+      - 9001:9001/tcp
+      - 9000:9000/tcp
+    command: server /data --console-address ":9001"
+    volumes:
+      - .data/minio:/data
+    healthcheck:
+      test: mc ready local
+      interval: 60s
+      timeout: 1s
+      retries: 3
+      start_period: 1s
+      start_interval: 1s

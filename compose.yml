@@ -35,7 +35,7 @@ services:
     volumes:
       - .data/starrocks:/opt/starrocks/fe/meta
     healthcheck:
-      test: 'mysql -u root -h starrocks-fe -P 9030 -e "show frontends\G" |grep "Alive: true"'
+      test: curl -f -s -o /dev/null -w '%{http_code}' http://localhost:8030 | grep 401
       interval: 60s
       timeout: 1s
       retries: 3
@@ -50,21 +50,18 @@ services:
     restart: unless-stopped
     container_name: starrocks-cn
     hostname: starrocks-cn
-    command:
-      - /bin/bash
-      - -c
-      - |
-        sleep 15s;
-        ulimit -u 65535;
-        ulimit -n 65535;
-        mysql --connect-timeout 2 -h starrocks-fe -P9030 -uroot -e "ALTER SYSTEM ADD COMPUTE NODE \"starrocks-cn:9050\";"
-        /opt/starrocks/cn/bin/start_cn.sh
+    command: /opt/starrocks/cn/bin/start_cn.sh
     environment:
       - HOST_TYPE=FQDN
     ports:
-      - 8040:8040
+      - 8040:8040/tcp
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 655350
+        hard: 655350
     healthcheck:
-      test: 'mysql -u root -h starrocks-fe -P 9030 -e "SHOW COMPUTE NODES\G" |grep "Alive: true"'
+      test: curl -f http://localhost:8040
       interval: 60s
       timeout: 1s
       retries: 3
@@ -73,7 +70,6 @@ services:
     depends_on:
       starrocks-fe:
         condition: service_healthy
-        restart: true
       minio:
         condition: service_healthy
 

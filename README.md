@@ -2,6 +2,8 @@
 
 Set up a simple StarRocks with MinIO inside Docker Compose.
 
+This example is based on the [StarRocks documentation](https://docs.starrocks.io/docs/quick_start/shared-data/), and [StarRocks repository](https://github.com/StarRocks/demo/tree/master/documentation-samples)
+
 ## Running
 
 Create a `.env` file in the follow `.env.example` file.
@@ -22,6 +24,12 @@ Then run the following SQL command to change the password, for example:
 
 ```sql
 SET PASSWORD = PASSWORD('$w0rdf1sh');
+```
+
+Add compute node
+
+```sql
+ALTER SYSTEM ADD COMPUTE NODE "starrocks-cn:9050";
 ```
 
 ## Create database

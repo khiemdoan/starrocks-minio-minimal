@@ -42,6 +42,8 @@ services:
       start_period: 1s
       start_interval: 1s
     depends_on:
+      starrocks-cn:
+        condition: service_healthy
       minio:
         condition: service_healthy
 
@@ -67,11 +69,6 @@ services:
       retries: 3
       start_period: 1s
       start_interval: 1s
-    depends_on:
-      starrocks-fe:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
 
   minio_mc:
     # This service is short lived, it does this:
@@ -79,7 +76,7 @@ services:
     # - checks to see if the MinIO service `minio` is ready
     # - creates a MinIO Access Key that the StarRocks services will use
     # - exits
-    image: quay.io/minio/mc:latest
+    image: quay.io/minio/mc:RELEASE.2025-07-21T05-28-08Z
     entrypoint:
       - sh
       - -c
@@ -99,7 +96,7 @@ services:
         condition: service_healthy
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
     restart: unless-stopped
     container_name: minio
     environment:

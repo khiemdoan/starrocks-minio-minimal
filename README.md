@@ -26,6 +26,12 @@ Then run the following SQL command to change the password, for example:
 SET PASSWORD = PASSWORD('$w0rdf1sh');
 ```
 
+Add compute node
+
+```sql
+ALTER SYSTEM ADD COMPUTE NODE "starrocks-cn:9050";
+```
+
 ## Create database
 
 You can create a database using the following SQL command:

@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     container_name: starrocks-fe
     hostname: starrocks-fe
+    user: 1000:1000
     command:
       - /bin/bash
       - -c
@@ -33,7 +34,7 @@ services:
       - 9020:9020/tcp
       - 9030:9030/tcp
     volumes:
-      - .data/starrocks:/opt/starrocks/fe/meta
+      - .data/starrocks-fe:/opt/starrocks/fe/meta:Z
     healthcheck:
       test: curl -f -s -o /dev/null -w '%{http_code}' http://localhost:8030 | grep 401
       interval: 60s
@@ -52,6 +53,7 @@ services:
     restart: unless-stopped
     container_name: starrocks-cn
     hostname: starrocks-cn
+    user: 1000:1000
     command: /opt/starrocks/cn/bin/start_cn.sh
     environment:
       - HOST_TYPE=FQDN
@@ -62,6 +64,8 @@ services:
       nofile:
         soft: 655350
         hard: 655350
+    volumes:
+      - .data/starrocks-cn:/opt/starrocks/cn/storage:Z
     healthcheck:
       test: curl -f http://localhost:8040
       interval: 60s
@@ -69,6 +73,9 @@ services:
       retries: 3
       start_period: 1s
       start_interval: 1s
+    depends_on:
+      minio:
+        condition: service_healthy
 
   minio_mc:
     # This service is short lived, it does this:
@@ -99,17 +106,18 @@ services:
     image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
     restart: unless-stopped
     container_name: minio
+    user: 1000:1000
+    command: server --console-address ":9001" /data
     environment:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    volumes:
+      - .data/minio:/data
     ports:
       - 9001:9001/tcp
       - 9000:9000/tcp
-    command: server /data --console-address ":9001"
-    volumes:
-      - .data/minio:/data
     healthcheck:
-      test: mc ready local
+      test: curl -f http://localhost:9000/minio/health/live
       interval: 60s
       timeout: 1s
       retries: 3

@@ -6,10 +6,12 @@ This example is based on the [StarRocks documentation](https://docs.starrocks.io
 
 ## Running
 
+Run `mkdirs.sh` to create necessary directories.
+
 Create a `.env` file in the follow `.env.example` file.
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 After the containers are up, you should change password for the `root` user in StarRocks.

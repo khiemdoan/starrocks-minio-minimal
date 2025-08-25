@@ -31,7 +31,6 @@ services:
         /opt/starrocks/fe/bin/start_fe.sh --host_type FQDN
     ports:
       - 8030:8030/tcp
-      - 9020:9020/tcp
       - 9030:9030/tcp
     volumes:
       - .data/starrocks-fe:/opt/starrocks/fe/meta:Z
@@ -73,9 +72,6 @@ services:
       retries: 3
       start_period: 1s
       start_interval: 1s
-    depends_on:
-      minio:
-        condition: service_healthy
 
   minio_mc:
     # This service is short lived, it does this:
@@ -84,6 +80,7 @@ services:
     # - creates a MinIO Access Key that the StarRocks services will use
     # - exits
     image: quay.io/minio/mc:RELEASE.2025-07-21T05-28-08Z
+    user: 1000:1000
     entrypoint:
       - sh
       - -c
@@ -112,7 +109,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
     volumes:
-      - .data/minio:/data
+      - .data/minio:/data:Z
     ports:
       - 9001:9001/tcp
       - 9000:9000/tcp
